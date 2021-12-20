@@ -1418,14 +1418,18 @@ void updateGlobalVariables(EST_Handle handle)
 //  if startup mode has been enabled, store the position of the hall state
 //      if estimated speed is less than low_pu, check if bldc mode is disabled
 //          if the bldc count is greater than 20, enable bldc mode
-//              and if currentctrl flag is enabled, motor runs in torque mode
-//                   else it runs in speed mode
+//               if currentctrl flag is enabled, motor runs in torque mode
+//               else it runs in speed mode
 //          it increment the count until it reaches 20
 //      else if the speed feedback is greater than high_pu, check if the bldc is enabled and if the count is greater than 20
 //      disable the bldc mode
 //      if currentctrl flag is enabled, motor runs in torque mode
 //      else it runs in speed mode
-
+//      if bldc is enabled
+//          check if currentctrl flag is enabled, motor enters into torque mode
+//          otherwise it moves to speed mode
+//      angle and speed estimation value is recorded
+//  angle and speed estimation value is recorded and call is made to peaktorquemode()
 
 void HALLBLDC_Ctrl_Run(void)
 {
@@ -1562,6 +1566,10 @@ void HALLBLDC_Ctrl_Run(void)
 }
 
 //! \brief
+//  Check the hall state and update the timer and speed feedback
+//      Check the direction positive or negative
+//      if direction is changed, speed feedback is reset.
+//  if hall state is equal to previous state then check if run_identify is true and increment the pwm count
 void HALLBLDC_State_Check(void)
 {
     // Hall_A, Hall_B, Hall_C
@@ -1669,7 +1677,7 @@ void HALLBLDC_Ctrl_Stop(void)
 
 //! \brief
 
-// This function finds the sensors direction
+//  This function finds the direction of the magnet either in North or South direction
 
 void HALLBLDC_Ctrl_PwmSet(uint16_t PwmState, _iq PwmDuty)
 {
