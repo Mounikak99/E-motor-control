@@ -1415,6 +1415,18 @@ void updateGlobalVariables(EST_Handle handle)
 
 
 //! \brief
+//  if startup mode has been enabled, store the position of the hall state
+//      if estimated speed is less than low_pu, check if bldc mode is disabled
+//          if the bldc count is greater than 20, enable bldc mode
+//              and if currentctrl flag is enabled, motor runs in torque mode
+//                   else it runs in speed mode
+//          it increment the count until it reaches 20
+//      else if the speed feedback is greater than high_pu, check if the bldc is enabled and if the count is greater than 20
+//      disable the bldc mode
+//      if currentctrl flag is enabled, motor runs in torque mode
+//      else it runs in speed mode
+
+
 void HALLBLDC_Ctrl_Run(void)
 {
     if(gHall_Flag_EnableStartup == true) //  Enable  BLDC mode
@@ -1442,7 +1454,7 @@ void HALLBLDC_Ctrl_Run(void)
                         PID_setUi(pidHandle[3], _IQmpy(pid[2].Ui, gFast2Hall_Ui_coef));
 
                     }
-                    else		// Speed Control Mode
+                    else		                            // Speed Control Mode
                     {
                         // The following instructions load the parameters for the speed PI
                         // controller.
@@ -1474,7 +1486,7 @@ void HALLBLDC_Ctrl_Run(void)
                     {
                         // The following instructions load the parameters for the speed PI
                         // controller.
-                        PID_setGains(pidHandle[0],_IQ(0.1),_IQ(0.183),_IQ(0.0));//SAKI-1  //Old value 10.0 & 0.02  // changed the KP value from 0.784 to 0.1
+                        PID_setGains(pidHandle[0],_IQ(0.784),_IQ(0.183),_IQ(0.0));//SAKI-1  //Old value 10.0 & 0.02
                         //PID_setGains(pidHandle[0],_IQ(1.0),_IQ(0.02),_IQ(0.0));//From TI
 
                         // Set the initial condition value for the integrator output to 0, Id
@@ -1656,6 +1668,9 @@ void HALLBLDC_Ctrl_Stop(void)
 }
 
 //! \brief
+
+// This function finds the sensors direction
+
 void HALLBLDC_Ctrl_PwmSet(uint16_t PwmState, _iq PwmDuty)
 {
     switch(PwmState)
@@ -1761,6 +1776,9 @@ void HALLBLDC_Ctrl_PwmSet(uint16_t PwmState, _iq PwmDuty)
 
 //! \brief          Engine error check
 //! return          Status of the error {true: error, false: no error}
+
+//  Get the status of battery, throttle and motor temperature
+//  If any one of the status exhibits error, then errorStatus will be true
 bool ENGINE_checkForErrors(void)
 {
     bool errorStatus ;
@@ -1774,31 +1792,32 @@ bool ENGINE_checkForErrors(void)
 
     temperatureStatus = getMotorTemperature();
 
-    if(batteryStatus || throttleStatus || temperatureStatus)
+    if(batteryStatus || throttleStatus || temperatureStatus)    //if either battery, throttle or temperature exhibits error
     {
-        errorStatus = true;
+        errorStatus = true;         //Error
     }
     else
     {
-        errorStatus = false;
+        errorStatus = false;        //No error
     }
 
     return(errorStatus);
 }//end of ENGINE_checkForErrors()
 
 
+// gHall_Flag_EnableBldc - Sets the motor to bldc mode
 //! \brief              Start the motor from zero speed and
 //!                     Set the motor current based on the tps value
 void ENGINE_StartUp(void)
 {
-    if(gHall_Flag_EnableBldc == true)
+    if(gHall_Flag_EnableBldc == true)       //Checks whether motor is in bldc mode
     {
-        gMotorVars.IqRef_A = _IQ(computeTps(&gAdcData));
-       //gMotorVars.IqRef_A = _IQ(USER_MOTOR_MAX_CURRENT);
+        gMotorVars.IqRef_A = _IQ(computeTps(&gAdcData));        //Applied tps value
+       //gMotorVars.IqRef_A = _IQ(USER_MOTOR_MAX_CURRENT);      //Max current is applied
     }
     else
     {
-        gMotorVars.IqRef_A = _IQ(computeTps(&gAdcData));
+        gMotorVars.IqRef_A = _IQ(computeTps(&gAdcData));        //Applied tps value
     }
 
 
@@ -1818,6 +1837,11 @@ void ENGINE_StartUp(void)
 
 
 //! \brief          Enable the PWM to run the motor based on tps value
+
+//  if the motor is idle/OFF and the throttle is ON
+//  make the Run_Identify and Motor_Run flag as true
+//  Once the throttle is OFF, reset all the parameters
+
 void ENGINE_ReadyToRun(void)
 {
     //check for the start switch  pressed for two times
@@ -1827,7 +1851,7 @@ void ENGINE_ReadyToRun(void)
 
     if(gFlag_Motor_Run != true)
     {
-        if(ENGINE_isTpsON(&gAdcData))
+        if(ENGINE_isTpsON(&gAdcData))       //Checks whether tps is in ON condition
         {
             gMotorVars.Flag_Run_Identify = true;
             gFlag_Motor_Run = true;
@@ -1857,6 +1881,11 @@ void ENGINE_ReadyToRun(void)
 
 //! \brief              Check for the tps is ON/OFF
 //! \param[in]          pAdcData       The pointer to the ADC data
+
+//  if the data is greater than start band
+//      throttle is ON
+//  else throttle is OFF
+
 //! \return             tpsOnOff       status of the tps  {true:tpsOn , false: tpsOff}
 bool ENGINE_isTpsON(HAL_AdcData_t *pAdcData)
 {
@@ -1864,12 +1893,13 @@ bool ENGINE_isTpsON(HAL_AdcData_t *pAdcData)
 
     if(pAdcData->potentiometer > START_BAND)
     {
-        tpsOnOff = true;
+        tpsOnOff = true;                //tpsOn
+
         //if (gTimerCnt<= MAX_TIMER_CNT_SEC)HAL_acqTimer0Int(halHandle);
     }
     else
     {
-        tpsOnOff = false;
+        tpsOnOff = false;               //tpsOff
     }
 
     return(tpsOnOff);
@@ -1878,14 +1908,20 @@ bool ENGINE_isTpsON(HAL_AdcData_t *pAdcData)
 
 //! \brief          Check for the IgnitionSwitch
 //!                 {true:motor ready to run,  false: waiting for the IgnitionSwitch}
+
+//  Check for the start switch condition
+//  if start switch is pressed and the if engine is not ready
+//      Increments the count value until it becomes true
+//  otherwise engine is in OFF state
+
 void ENGINE_IgnitionSwitch(void)
 {
     //check for the start switch pressed for two times
     if(getStartSwitch())
     {
-        if(EngineReady == false)
+        if(EngineReady == false)    //Engine is not ready
         {
-            gReadyCount++;
+            gReadyCount++;          //Increments the count value until it becomes true
 
             EngineReady = true;       //Engine is ON
         }
@@ -1899,7 +1935,13 @@ void ENGINE_IgnitionSwitch(void)
 }//end of ENGINE_IgnitionSwitch()
 
 
+//  Flag_Run_Identify - Identifies the motor, defined in main.h
+//  gstallCount - vehicle is in stale condition (not running for a certain amount of time/ idle)
+//  STALL_IN_SEC - Specific time period where the vehicle can be in stall state, already defined
+
 //! \brief          Check for the motor overload condition
+//                  if a running motor becomes idle for certain amount of time, that means it is overloaded
+//                  else it works normal
 //! \return         stallCondition       Status of the stall condition {true:overloaded , false: normal}
 bool computeOverLoad(void)
 {
@@ -1943,6 +1985,16 @@ bool getStopSwitch(void)
 
 //! \brief          Compute the tps value from the potentiometer
 //! \param[in]      pAdcData     The pointer to the ADC data
+//                  check for the start band condition
+//                  if the throttle value is higher than start band and
+//                      if throttle value is greater or less than the calculated toggling value
+//                          if throttle value greater than end band
+//                              then Apply Max current
+//                          else get the tps value and if tps value is greater than max current
+//                              Apply Max current
+//                      Assign the throttle value for toggling point
+//                  else throttle & toggling point value will be zero when throttle is in zero position
+//
 //! \return         gTps         Get the throttle position value (tps)
 _iq computeTps(HAL_AdcData_t *pAdcData)
 {
@@ -1959,7 +2011,7 @@ _iq computeTps(HAL_AdcData_t *pAdcData)
             //trim Tps value
             if (throttleValue > END_BAND)
             {
-                gTps = MOTOR_MAX_CURRENT;
+                gTps = MOTOR_MAX_CURRENT;       //Max current is applied
             }
             else
             {
@@ -1990,7 +2042,7 @@ _iq computeTps(HAL_AdcData_t *pAdcData)
 //! \return        tpsError     The state of the throttle wiring connection
 bool getThrottleCalibration(void)
 {
-    bool tpsError = false;
+    bool tpsError = false;          //No error
 
     //gtest= gAdcData.potentiometer;
 
@@ -1999,22 +2051,20 @@ bool getThrottleCalibration(void)
 
 
 //! \brief          Get the status of battery
+//                  if battery status shows greater than 60 or less than 50
 //! \return         VoltageErrorr     The state of the battery Voltage
 bool getBatteryStatus(void)
 {
     bool voltageError;
 
-    if ((gMotorVars.VdcBus_kV > OVER_VOLTAGE_Kv) || (gMotorVars.VdcBus_kV < UNDER_VOLTAGE_Kv))
+    if ((gMotorVars.VdcBus_kV > OVER_VOLTAGE_Kv) || (gMotorVars.VdcBus_kV < UNDER_VOLTAGE_Kv))  //Battery greater than 60 or less than 50
     {
-
-
-        voltageError = true;
+        voltageError = true;    //Error
 
     }
     else
     {
-
-        voltageError = false;
+        voltageError = false;   //No error
 
     }
 
@@ -2023,6 +2073,9 @@ bool getBatteryStatus(void)
 
 
 //! \brief          Get the temperature of the motor Using the Rs Online Feature
+//                  temperature calculation : (35)+ (RsOnLine_Ohm * (16.3) - 1.0) * (254.4)
+//                  if motor temp is greater than max temp then there is an error
+//                  else no error
 //! \return         temperatureError     The state of the motor temperature
 bool getMotorTemperature(void)
 {
@@ -2033,13 +2086,13 @@ bool getMotorTemperature(void)
             (gMotorVars.RsOnLine_Ohm * (INV_RS_AT_ROOM_TEMP_INV_OHMS)-1.0)*\
             (INV_COPPER_TEMP_COEF_C);
 
-    if (gMotorTemperature_C > MOTOR_MAX_TEMP_C)
+    if (gMotorTemperature_C > MOTOR_MAX_TEMP_C) //Temperature is greater than 100.0
     {
-        temperatureError = true;
+        temperatureError = true;    //Error
     }
     else
     {
-        temperatureError = false;
+        temperatureError = false;   //No error
     }
 
     return(temperatureError);
@@ -2065,16 +2118,27 @@ void enableLpmDrv8301(void)
 
 
 #ifdef STARTUP
-//! \brief              Starting the motor with three condition
-//!                       1) low speed - set peak current
-//!                       2) back to low speed - set low speed current
-//!                       3) Crossing the timercnt - set TPS value
-//!
+
+//! \brief     Starting the motor with three conditions
+//!                  1) low speed - set peak current
+//!                  2) back to low speed - set low speed current
+//!                  3) Crossing the timercnt - set TPS value
+
+// EnablePeakCurrent - global
+// _IQabs - Makes negative numbers as positive, defined in IQmathLib.h
+// gHall_krpm - revolution per minute, global
+// gTimerCnt - reads the timer count, global
+// MAX_TIMER_CNT_SEC(delay) - maximum timer count (already defined), global
+// USER_MOTOR_MAX_CURRENT - max current the motor should exhibit, current is already defined in user.h
+// gHall_speed_FastToBldc_low_pu - when motor enters from FOC(Fast) to BLDC(Sensor) mode, global
+// MOTOR_LOWSPEED_CURRENT - current at low speed, global, speed already defined
+// _IQ(computeTps(&gAdcData)) - tps value is applied once this function is called
+
 void new_startup(void)
 {
     if (EnablePeakCurrent == true)
     {
-        if ((_IQabs(gHall_krpm) <=_IQ(0.004)) && (gTimerCnt < MAX_TIMER_CNT_SEC))  //Speed is less than 5rpm and timer gTimerCnt is less than 5 Sec
+        if ((_IQabs(gHall_krpm) <=_IQ(0.004)) && (gTimerCnt < MAX_TIMER_CNT_SEC))  //Speed is less than 4rpm and timer gTimerCnt is less than 20 Sec
         {
             gMotorVars.IqRef_A = _IQ(USER_MOTOR_MAX_CURRENT); //set motor max current
         }
@@ -2084,15 +2148,15 @@ void new_startup(void)
             gMotorVars.IqRef_A = _IQ(MOTOR_LOWSPEED_CURRENT); //set constant current
             //gflag = false;
         }
-        else if ((gTimerCnt >= MAX_TIMER_CNT_SEC) && (gflag == false))
+        else if ((gTimerCnt >= MAX_TIMER_CNT_SEC) && (gflag == false))  //Timer is greater than 20 sec and flag is false
         {
-            gMotorVars.IqRef_A = _IQ(computeTps(&gAdcData));
+            gMotorVars.IqRef_A = _IQ(computeTps(&gAdcData));    //Set tps value
             HAL_setGpioHigh(halHandle,(GPIO_Number_e)GPIO_Number_22); //Turn off STATUS LED
         }
     }
     else
     {
-        gMotorVars.IqRef_A = _IQ(computeTps(&gAdcData)); //if speed is above the BLDC to fast condition, Tps will be activated
+        gMotorVars.IqRef_A = _IQ(computeTps(&gAdcData)); //if speed is above the BLDC to fast condition, Tps value will be activated
         gflag = true;
     }
 }//end of new_startup()
@@ -2102,6 +2166,20 @@ void new_startup(void)
 //! \brief      Set the Peak current flag based on the speed of the motor {true: enable peak current; false: disable peak current}
 //! \param[in]  Void
 //! \return     Void
+
+// EnablePeakCurrentMode, EnablePeakCurrent - global
+// IQabs - Makes negative numbers as positive, defined in IQmathLib.h
+// speed_est_pu - speed estimation per unit, global
+// gHall_speed_FastToBldc_low_pu - when motor enters from FOC(Fast) to BLDC(Sensor) mode, global
+// gHall_speed_fdb_pu - speed feedback, global
+// gHall_speed_BldcToFast_high_pu - when motor enters from BLDC(Sensor) to FOC(Fast) mode, global
+
+//  Check the following conditions
+// if EnablePeakCurrentMode is true and if the speed is less than low_pu
+// then enable the PeakCurrent if it is already disabled
+// if speed is greater than high_pu
+// then disable PeakCurrent if it is already enabled
+
 void PeakTorqueMode(void)
 {
     //check enable startup
@@ -2110,17 +2188,17 @@ void PeakTorqueMode(void)
         //if speed less than FastToBldc
         if(_IQabs(speed_est_pu)  < gHall_speed_FastToBldc_low_pu)//50
         {
-            if(EnablePeakCurrent == false)     //check peakcurrent
+            if(EnablePeakCurrent == false)     //check PeakCurrent
             {
-                EnablePeakCurrent = true;      //disable peakcurrent
+                EnablePeakCurrent = true;      //disable PeakCurrent
             }
         }
         //if speed greater than BldcToFast
         else if(_IQabs(gHall_speed_fdb_pu) > gHall_speed_BldcToFast_high_pu)//100
         {
-            if(EnablePeakCurrent  == true)     // check peakcurrent
+            if(EnablePeakCurrent  == true)     // check PeakCurrent
             {
-                EnablePeakCurrent  = false;    //disable peakcurrent
+                EnablePeakCurrent  = false;    // disable PeakCurrent
             }
         }
     }
@@ -2131,6 +2209,20 @@ void PeakTorqueMode(void)
 
 //********************************************END SAKI-1******************************************
 
+// Flag_Run_Identify - Identifies the motor, defined in main.h
+// Flag_RunState - Run the motor, defined in main.h
+// Flag_enableFlyingStart - User may be moving the vehicle without starting or they may be driving from hill top
+//                          with very low speed and when they suddenly increase the speed, the vehicle should be able to
+//                          move smoothly without a jerk or giving back and forth movement
+//                        - defined in main.h
+
+// Once the motor is identified and if the motor is idle (stop to start condition)
+// flying start flag is enabled and reset
+// Enable runstate flag (motor starts running)
+
+// if motor is already in run condition (Run to Stop condition)
+// disable the flying start
+// disable runstate flag
 
 void motor_RunCtrl(void)
 {
@@ -2174,6 +2266,15 @@ void motor_RunCtrl(void)
 //! \brief      Convert per unit to krpm
 //! \param[in]  Speed_pu    Speed in per unit
 //! \return     Speed_kRPM  Speed in krpm
+
+// USER_IQ_FULL_SCALE_FREQ_Hz is defined in user.h
+//! \brief          Defines the full scale frequency for IQ variable, Hz
+// _iq pu_to_khz_sf = 338.5/1000.0 = 0.3385
+// USER_MOTOR_NUM_POLE_PAIRS is defined in user.h
+// _iq khz_to_krpm_sf = 60.0/26 = 2.307
+// _iq Mechanical_Freq_kHz = _IQmpy(speed, 0.3385)
+// _iq Speed_kRPM = _IQmpy(Mechanical_Freq_kHz, 2.307)
+
 static inline _iq perUnit_to_Krpm(_iq Speed_pu)
 {
     _iq pu_to_khz_sf = _IQ(USER_IQ_FULL_SCALE_FREQ_Hz/1000.0);
