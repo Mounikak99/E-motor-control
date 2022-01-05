@@ -92,7 +92,7 @@
 #define START_BAND                     (1150)    //1063  value for old throttle
 #define END_BAND                       (3180)
 #define TPS_TOLERENCE_IN_PERCENTAGE    (5)
-#define BASE_CURRENT_A                 (12)    //Default (1) ,min current needed to run the motor at no-load
+#define BASE_CURRENT_A                 (1)    //Default (1) ,min current needed to run the motor at no-load
 #define NO_OF_DIVISION                 (15)
 #define WIDTH_PER_DIVISION             ((END_BAND - START_BAND)/NO_OF_DIVISION)
 #define MOTOR_MAX_CURRENT              (40)
@@ -257,8 +257,8 @@ _iq gFast2Hall_Ui_coef = _IQ(0.02); //default (2.0)
 
 // BLDC speed
 _iq gHall_speed_fdb_pu = _IQ(0.0);
-_iq gHall_speed_FastToBldc_low_pu  = _IQ(0.0200*USER_MOTOR_NUM_POLE_PAIRS*1000.0/(USER_IQ_FULL_SCALE_FREQ_Hz * 60.0));		// 400rpm   //30rpm
-_iq gHall_speed_BldcToFast_high_pu = _IQ(0.0300*USER_MOTOR_NUM_POLE_PAIRS*1000.0/(USER_IQ_FULL_SCALE_FREQ_Hz * 60.0));		// 750rpm   //50rpm
+_iq gHall_speed_FastToBldc_low_pu  = _IQ(0.0060*USER_MOTOR_NUM_POLE_PAIRS*1000.0/(USER_IQ_FULL_SCALE_FREQ_Hz * 60.0));		// 400rpm   //30rpm //20rpm //10rpm //10rpm
+_iq gHall_speed_BldcToFast_high_pu = _IQ(0.0100*USER_MOTOR_NUM_POLE_PAIRS*1000.0/(USER_IQ_FULL_SCALE_FREQ_Hz * 60.0));		// 750rpm   //50rpm //30rpm //20rpm //15rpm
 
 uint16_t gHall_PwmState = 0;
 
@@ -281,6 +281,7 @@ bool gHall_Flag_EnableBldc = true;
 bool gHall_Flag_EnableStartup = true;		// true->enable hall startup
 //bool gHall_Flag_EnableStartup = false;	// false->disable hall startup
 bool gHall_Flag_CurrentCtrl = true;
+//bool gHall_Flag_CurrentCtrl = false;
 bool gHall_Flag_State_Change = false;
 
 uint32_t gHall_timer_now= 0;
@@ -332,8 +333,6 @@ bool gInBLDC = true;
 
 bool EnablePeakCurrentMode = true;
 bool EnablePeakCurrent = true;
-
-
 
 
 // **************************************************************************
@@ -1433,8 +1432,10 @@ void updateGlobalVariables(EST_Handle handle)
 
 void HALLBLDC_Ctrl_Run(void)
 {
-    if(gHall_Flag_EnableStartup == true) //  Enable  BLDC mode
+     if(gHall_Flag_EnableStartup == true) //  Enable  BLDC mode
     {
+      //  gMotorVars.Flag_enableSpeedCtrl = true; // For testing speed loop in BLDC mode 24/12/21
+
         gHall_PwmState = gHall_PwmIndex[gHall_State]; // Store the position of the Hall state
 
         if(_IQabs(speed_est_pu)  < gHall_speed_FastToBldc_low_pu)	// FAST to Hall
@@ -1451,7 +1452,9 @@ void HALLBLDC_Ctrl_Run(void)
                     {
                         // The following instructions load the parameters for the speed PI
                         // controller.
-                        PID_setGains(pidHandle[0],_IQ(0.784),_IQ(0.183),_IQ(0.0));// From SAKI-1  //10.1 & 0.005
+                        PID_setGains(pidHandle[0],_IQ(0.7),_IQ(0.0183),_IQ(0.0));// From SAKI-1  //10.1 & 0.005 // 0.7 kp ,0.0183 ki value
+                        PID_setGains(pidHandle[1],_IQ(0.7),_IQ(0.0183),_IQ(0.0));
+                        PID_setGains(pidHandle[2],_IQ(0.7),_IQ(0.0183),_IQ(0.0));   //added pidhandle[2] with same kp,ki values //mk //0.7 kp 0.0183 ki value
                         //PID_setGains(pidHandle[0],_IQ(2.0),_IQ(0.005),_IQ(0.0)); //From TI
 
                         // Set the initial condition value for the integrator output to 0
@@ -1490,14 +1493,16 @@ void HALLBLDC_Ctrl_Run(void)
                     {
                         // The following instructions load the parameters for the speed PI
                         // controller.
-                        PID_setGains(pidHandle[0],_IQ(0.784),_IQ(0.183),_IQ(0.0));//SAKI-1  //Old value 10.0 & 0.02
+                        PID_setGains(pidHandle[0],_IQ(0.7),_IQ(0.0183),_IQ(0.0));//SAKI-1  //Old value 10.0 & 0.02  // changed from pidHandle[0] to [2]  //0.7 kp, 0.0183 ki value
+                        PID_setGains(pidHandle[1],_IQ(0.7),_IQ(0.0183),_IQ(0.0));
+                        PID_setGains(pidHandle[2],_IQ(0.7),_IQ(0.0183),_IQ(0.0));   //added pidhandle[2] with same kp,ki values //mk //0.7 kp ,0.0183 ki value
                         //PID_setGains(pidHandle[0],_IQ(1.0),_IQ(0.02),_IQ(0.0));//From TI
 
                         // Set the initial condition value for the integrator output to 0, Id
                         PID_setUi(pidHandle[1],_IQ(0.0));
 
                         // Set the initial condition value for the integrator output to 0, Iq
-                        PID_setUi(pidHandle[2], _IQmpy(pid[3].Ui, _IQ(0.025))); //default (0.25)
+                        PID_setUi(pidHandle[2], _IQmpy(pid[3].Ui, _IQ(0.25))); //default (0.25)
 
 
                     }
@@ -1540,6 +1545,10 @@ void HALLBLDC_Ctrl_Run(void)
                 // BLDC current loop
                 PID_run(pidHandle[3],gHall_BLDC_Is_ref_pu,gHall_BLDC_Is_fdb_pu,&gHall_PwmDuty);
 
+                PID_setGains(pidHandle[0],_IQ(0.7),_IQ(0.0000183),_IQ(0.0));// From SAKI-1  //10.1 & 0.005 // 0.7 kp ,0.0183 ki value
+                PID_setGains(pidHandle[1],_IQ(0.7),_IQ(0.0000183),_IQ(0.0));
+                PID_setGains(pidHandle[2],_IQ(0.7),_IQ(0.0000183),_IQ(0.0));
+
                 HALLBLDC_Ctrl_PwmSet(gHall_PwmState, gHall_PwmDuty);
             }
             else	// Speed Control Mode
@@ -1553,6 +1562,7 @@ void HALLBLDC_Ctrl_Run(void)
             angle_pu = angle_est_pu;
             speed_pu = speed_est_pu;
             //PID_setGains(pidHandle[0],_IQ(8.0),_IQ(0.005),_IQ(0.0));    //SAKI-1 set kp and ki value for FOC
+           // gMotorVars.Flag_enableSpeedCtrl = false;
         }
     }
     else	//(gHall_Flag_EnableStartup == false)
@@ -2028,7 +2038,14 @@ _iq computeTps(HAL_AdcData_t *pAdcData)
                 gTps = (gTps * (MOTOR_MAX_CURRENT/NO_OF_DIVISION))+(BASE_CURRENT_A);
 
                 //limit the tps value under the motor max current
-                if(gTps > MOTOR_MAX_CURRENT)gTps = MOTOR_MAX_CURRENT;
+                if(gHall_Flag_EnableBldc == true)
+                {
+                    gTps = gTps*2;
+                }
+                else if(gTps > MOTOR_MAX_CURRENT)
+                {
+                    gTps = MOTOR_MAX_CURRENT;
+                }
             }
 
             //set current throttle value for processing toggling
@@ -2247,7 +2264,7 @@ void motor_RunCtrl(void)
         }
 
     }
-    else if(gMotorVars.Flag_RunState == true)  // Run to Stop
+    else if(gMotorVars.Flag_RunState == true)  // Run to Stop (Stop the motor if it is already running freely)
     {
 
         FS_setFlag_enableFs(fsHandle, false);
