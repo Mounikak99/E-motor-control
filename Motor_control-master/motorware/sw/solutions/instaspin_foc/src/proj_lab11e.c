@@ -67,6 +67,7 @@
 // the defines
 
 #define LED_BLINK_FREQ_Hz   5
+#define DELAY_COUNT 3       //27/1 mk
 
 #define HAL_GPIO_SW1 GPIO_Number_9 // Used for gEnginestartSW (SW1 in board)
 #define HAL_GPIO_SW2 GPIO_Number_7 // For future use (SW2 in board)
@@ -95,8 +96,8 @@
 #define BASE_CURRENT_A                 (1)    //Default (1) ,min current needed to run the motor at no-load
 #define NO_OF_DIVISION                 (15)
 #define WIDTH_PER_DIVISION             ((END_BAND - START_BAND)/NO_OF_DIVISION)
-#define MOTOR_MAX_CURRENT              (40)
-#define MOTOR_LOWSPEED_CURRENT         (40)
+#define MOTOR_MAX_CURRENT              (10)
+#define MOTOR_LOWSPEED_CURRENT         (10)
 #define MAX_TIMER_CNT_SEC              (20)
 
 #define STALL_IN_SEC    (5)    //Stall condition check in sec
@@ -283,6 +284,7 @@ bool gHall_Flag_EnableStartup = true;		// true->enable hall startup
 bool gHall_Flag_CurrentCtrl = true;
 //bool gHall_Flag_CurrentCtrl = false;
 bool gHall_Flag_State_Change = false;
+bool gSensor_flag = true;      //mk 27/1
 
 uint32_t gHall_timer_now= 0;
 uint32_t gHall_timer_prev = 0;
@@ -311,6 +313,9 @@ uint16_t gLEDcnt   =  0;
 uint16_t gHallCount = 0;
 uint16_t gstallCount = 0;
 uint16_t gReadyCount = 0;
+uint16_t gCount = 1; //27/1 mk
+
+
 
 _iq gTps           = _IQ(0.0);
 _iq togglingPt     = _IQ(0.0);
@@ -333,6 +338,7 @@ bool gInBLDC = true;
 
 bool EnablePeakCurrentMode = true;
 bool EnablePeakCurrent = true;
+bool tpsOnOff;      //mk
 
 
 // **************************************************************************
@@ -910,7 +916,31 @@ interrupt void mainISR(void)
     if(++gLEDcnt >= (uint_least32_t)(USER_ISR_FREQ_Hz / LED_BLINK_FREQ_Hz))
     {
         HAL_toggleLed(halHandle,(GPIO_Number_e)HAL_Gpio_LED2);
-        gLEDcnt = 0;
+
+       if(gHall_Flag_EnableBldc == true && gSensor_flag == true)  //{  //current ramp in sensor(bldc) mode //24/1
+       {
+          // if(tpsOnOff == true)
+          // {
+               if(gLEDcnt == DELAY_COUNT)
+               {
+                   gTps=10/15*gCount;
+                   gCount++;
+                   gLEDcnt=0;
+               }
+               else
+               {
+                   gLEDcnt++;
+               }
+         //  }
+       }
+
+     /*  else
+       {
+           gSensor_flag = false;
+           gTps=0;
+       }           */                //} mk
+
+      //  gLEDcnt = 0;      // default code , commented for current ramp purpose
 
         //SAKI-1
         if(gstop)HAL_toggleLed(halHandle,(GPIO_Number_e)GPIO_Number_15); //LED-11 toggle
@@ -1452,9 +1482,12 @@ void HALLBLDC_Ctrl_Run(void)
                     {
                         // The following instructions load the parameters for the speed PI
                         // controller.
-                        PID_setGains(pidHandle[0],_IQ(0.7),_IQ(0.0183),_IQ(0.0));// From SAKI-1  //10.1 & 0.005 // 0.7 kp ,0.0183 ki value
-                        PID_setGains(pidHandle[1],_IQ(0.7),_IQ(0.0183),_IQ(0.0));
-                        PID_setGains(pidHandle[2],_IQ(0.7),_IQ(0.0183),_IQ(0.0));   //added pidhandle[2] with same kp,ki values //mk //0.7 kp 0.0183 ki value
+                        PID_setGains(pidHandle[0],_IQ(0.784),_IQ(0.183),_IQ(0.0));// From SAKI-1  //10.1 & 0.005
+
+                       // PID_setGains(pidHandle[0],_IQ(0.7),_IQ(0.0183),_IQ(0.0));// From SAKI-1  //10.1 & 0.005 // 0.7 kp ,0.0183 ki value
+                      //  PID_setGains(pidHandle[1],_IQ(0.7),_IQ(0.0183),_IQ(0.0));
+                      //  PID_setGains(pidHandle[2],_IQ(0.7),_IQ(0.0183),_IQ(0.0));   //added pidhandle[2] with same kp,ki values //mk //0.7 kp 0.0183 ki value
+
                         //PID_setGains(pidHandle[0],_IQ(2.0),_IQ(0.005),_IQ(0.0)); //From TI
 
                         // Set the initial condition value for the integrator output to 0
@@ -1493,9 +1526,12 @@ void HALLBLDC_Ctrl_Run(void)
                     {
                         // The following instructions load the parameters for the speed PI
                         // controller.
-                        PID_setGains(pidHandle[0],_IQ(0.7),_IQ(0.0183),_IQ(0.0));//SAKI-1  //Old value 10.0 & 0.02  // changed from pidHandle[0] to [2]  //0.7 kp, 0.0183 ki value
-                        PID_setGains(pidHandle[1],_IQ(0.7),_IQ(0.0183),_IQ(0.0));
-                        PID_setGains(pidHandle[2],_IQ(0.7),_IQ(0.0183),_IQ(0.0));   //added pidhandle[2] with same kp,ki values //mk //0.7 kp ,0.0183 ki value
+                        PID_setGains(pidHandle[0],_IQ(0.784),_IQ(0.183),_IQ(0.0));//SAKI-1  //Old value 10.0 & 0.02
+
+                      //  PID_setGains(pidHandle[0],_IQ(0.7),_IQ(0.0183),_IQ(0.0));//SAKI-1  //Old value 10.0 & 0.02
+                       // PID_setGains(pidHandle[1],_IQ(0.7),_IQ(0.0183),_IQ(0.0));
+                     //  PID_setGains(pidHandle[2],_IQ(0.7),_IQ(0.0183),_IQ(0.0));   //added pidhandle[2] with same kp,ki values //mk //0.7 kp ,0.0183 ki value
+
                         //PID_setGains(pidHandle[0],_IQ(1.0),_IQ(0.02),_IQ(0.0));//From TI
 
                         // Set the initial condition value for the integrator output to 0, Id
@@ -1533,6 +1569,7 @@ void HALLBLDC_Ctrl_Run(void)
 
         if(gHall_Flag_EnableBldc)
         {
+            gSensor_flag = true;        //mk  27/1
             angle_pu = angle_est_pu;
             speed_pu = gHall_speed_fdb_pu;
 
@@ -1545,9 +1582,9 @@ void HALLBLDC_Ctrl_Run(void)
                 // BLDC current loop
                 PID_run(pidHandle[3],gHall_BLDC_Is_ref_pu,gHall_BLDC_Is_fdb_pu,&gHall_PwmDuty);
 
-                PID_setGains(pidHandle[0],_IQ(0.7),_IQ(0.0000183),_IQ(0.0));// From SAKI-1  //10.1 & 0.005 // 0.7 kp ,0.0183 ki value
-                PID_setGains(pidHandle[1],_IQ(0.7),_IQ(0.0000183),_IQ(0.0));
-                PID_setGains(pidHandle[2],_IQ(0.7),_IQ(0.0000183),_IQ(0.0));
+             //   PID_setGains(pidHandle[0],_IQ(0.7),_IQ(0.0000183),_IQ(0.0));// From SAKI-1  //10.1 & 0.005 // 0.7 kp ,0.0183 ki value
+              //  PID_setGains(pidHandle[1],_IQ(0.7),_IQ(0.0000183),_IQ(0.0));
+             //   PID_setGains(pidHandle[2],_IQ(0.7),_IQ(0.0000183),_IQ(0.0));
 
                 HALLBLDC_Ctrl_PwmSet(gHall_PwmState, gHall_PwmDuty);
             }
@@ -1556,12 +1593,15 @@ void HALLBLDC_Ctrl_Run(void)
                 gHall_PwmDuty = speed_pid_out;
                 HALLBLDC_Ctrl_PwmSet(gHall_PwmState, gHall_PwmDuty);
             }
+
         }
+
         else
         {
+            gSensor_flag = false;    //mk 27/1
             angle_pu = angle_est_pu;
             speed_pu = speed_est_pu;
-            //PID_setGains(pidHandle[0],_IQ(8.0),_IQ(0.005),_IQ(0.0));    //SAKI-1 set kp and ki value for FOC
+           //PID_setGains(pidHandle[0],_IQ(8.0),_IQ(0.005),_IQ(0.0));  //SAKI-1 set kp and ki value for FOC
            // gMotorVars.Flag_enableSpeedCtrl = false;
         }
     }
@@ -2038,14 +2078,20 @@ _iq computeTps(HAL_AdcData_t *pAdcData)
                 gTps = (gTps * (MOTOR_MAX_CURRENT/NO_OF_DIVISION))+(BASE_CURRENT_A);
 
                 //limit the tps value under the motor max current
-                if(gHall_Flag_EnableBldc == true)
-                {
-                    gTps = gTps*2;
-                }
-                else if(gTps > MOTOR_MAX_CURRENT)
-                {
-                    gTps = MOTOR_MAX_CURRENT;
-                }
+                if(gTps > MOTOR_MAX_CURRENT)gTps = MOTOR_MAX_CURRENT;
+
+              // if(gHall_Flag_EnableBldc == true)
+              // {
+              //     gTps = gTps*2;
+             //  }
+             //  else if(gTps > MOTOR_MAX_CURRENT)
+            //  {
+            //       gTps = MOTOR_MAX_CURRENT;
+            //  }
+            //  else
+           //   {
+           //     gTps=gTps;
+           //   }
             }
 
             //set current throttle value for processing toggling
