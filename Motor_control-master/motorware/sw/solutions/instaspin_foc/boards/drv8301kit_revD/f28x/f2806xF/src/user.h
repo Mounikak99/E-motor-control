@@ -728,7 +728,7 @@ extern "C" {
 #define USER_MOTOR_MAGNETIZING_CURRENT  (NULL)
 #define USER_MOTOR_RES_EST_CURRENT      (4.0)
 #define USER_MOTOR_IND_EST_CURRENT      (-4.0)
-#define USER_MOTOR_MAX_CURRENT          (10.0)
+#define USER_MOTOR_MAX_CURRENT          (40.0)
 #define USER_MOTOR_FLUX_EST_FREQ_Hz     (33.0)
 
 #ifndef USER_MOTOR
