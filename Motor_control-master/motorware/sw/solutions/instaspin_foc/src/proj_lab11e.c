@@ -66,9 +66,9 @@
 // **************************************************************************
 // the defines
 
-#define LED_BLINK_FREQ_Hz   5
+#define LED_BLINK_FREQ_Hz   5       //5
 //#define DELAY_COUNT 3      // mk
-//#define MAX_COUNT   10  //mk
+#define MAX_COUNT   15       //mk
 
 #define HAL_GPIO_SW1 GPIO_Number_9 // Used for gEnginestartSW (SW1 in board)
 #define HAL_GPIO_SW2 GPIO_Number_7 // For future use (SW2 in board)
@@ -91,7 +91,7 @@
 #define HALL_COUNT           (ONE_HALL_ROTATION * NO_OF_REVOLUTION)   //total hall count
 
 //SAKI-1 Throttle configuration
-#define START_BAND                     (1150)    //1063  value for old throttle
+#define START_BAND                     (1300)   //1150 //1063  value for old throttle
 #define END_BAND                       (3180)
 #define TPS_TOLERENCE_IN_PERCENTAGE    (5)
 #define BASE_CURRENT_A                 (1)    //Default (1) ,min current needed to run the motor at no-load
@@ -287,6 +287,7 @@ bool gHall_Flag_CurrentCtrl = true;
 bool gHall_Flag_State_Change = false;
 //bool gSensor_flag = true;      //mk
 //bool gSensor_flag = false;      //mk
+//bool gtpsOnOff = false;       //mk
 
 uint32_t gHall_timer_now= 0;
 uint32_t gHall_timer_prev = 0;
@@ -315,8 +316,9 @@ uint16_t gLEDcnt   =  0;
 uint16_t gHallCount = 0;
 uint16_t gstallCount = 0;
 uint16_t gReadyCount = 0;
-//uint16_t gCount = 0; // mk
-//uint16_t giq_ramp_cnt = 0;  //mk
+//uint16_t gCount = 0;      // mk
+uint16_t giq_ramp_cnt = 0;  //mk
+uint16_t gtest = 0;         //mk
 
 _iq gTps           = _IQ(0.0);
 _iq togglingPt     = _IQ(0.0);
@@ -339,7 +341,6 @@ bool gInBLDC = true;
 
 bool EnablePeakCurrentMode = true;
 bool EnablePeakCurrent = true;
-//bool tpsOnOff = false;      //mk
 
 
 // **************************************************************************
@@ -918,7 +919,15 @@ interrupt void mainISR(void)
     {
         HAL_toggleLed(halHandle,(GPIO_Number_e)HAL_Gpio_LED2);
 
-        /*  if(tpsOnOff == true && giq_ramp_cnt < MAX_COUNT)     //{  //current ramp in sensor(bldc) mode //mk
+        if(gHall_Flag_EnableBldc == true && ENGINE_isTpsON(&gAdcData) == true)     //{ mk
+         {
+            if(giq_ramp_cnt < MAX_COUNT)
+            {
+                giq_ramp_cnt++;
+            }
+         }                                        //}  mk
+
+        /*  if(tpsOnOff == true && giq_ramp_cnt < MAX_COUNT)   //{ //current ramp in sensor(bldc) mode //mk
            {
                giq_ramp_cnt++;
            }
@@ -928,7 +937,7 @@ interrupt void mainISR(void)
            }       */                                    //} mk
 
 
-        gLEDcnt = 0;      // default LED blink code , commented for current ramp purpose  //mk
+        gLEDcnt = 0;      // default LED blink code
 
         //SAKI-1
         if(gstop)HAL_toggleLed(halHandle,(GPIO_Number_e)GPIO_Number_15); //LED-11 toggle
@@ -1586,7 +1595,7 @@ void HALLBLDC_Ctrl_Run(void)
 
         else
         {
-           // gSensor_flag = false;    //mk
+           // gSensor_flag = false;         //mk
             angle_pu = angle_est_pu;
             speed_pu = speed_est_pu;
            //PID_setGains(pidHandle[0],_IQ(8.0),_IQ(0.005),_IQ(0.0));  //SAKI-1 set kp and ki value for FOC
@@ -1941,12 +1950,14 @@ bool ENGINE_isTpsON(HAL_AdcData_t *pAdcData)
     if(pAdcData->potentiometer > START_BAND)
     {
         tpsOnOff = true;                //tpsOn
+        gtest = gAdcData.potentiometer;         //mk
 
         //if (gTimerCnt<= MAX_TIMER_CNT_SEC)HAL_acqTimer0Int(halHandle);
     }
     else
     {
         tpsOnOff = false;               //tpsOff
+
     }
 
     return(tpsOnOff);
@@ -2062,17 +2073,17 @@ _iq computeTps(HAL_AdcData_t *pAdcData)
             }
             else
             {
-             /*   if(gHall_Flag_EnableBldc == true)   // { mk
+                if(gHall_Flag_EnableBldc == true)   // { mk
                 {
                     gTps = giq_ramp_cnt;
                 }
                 else
-                {                     */              // } mk
+                {                                   // } mk
                     //get the Tps value
                     gTps = ((throttleValue - startValue)/(WIDTH_PER_DIVISION));
                     gTps = (gTps * (MOTOR_MAX_CURRENT/NO_OF_DIVISION))+(BASE_CURRENT_A);
 
-              //  }                                  // mk
+                }                                  // mk
 
 
                 //limit the tps value under the motor max current
