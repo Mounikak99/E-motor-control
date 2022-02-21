@@ -68,7 +68,7 @@
 
 #define LED_BLINK_FREQ_Hz   5       //5
 //#define DELAY_COUNT 3      // mk
-#define MAX_COUNT   15       //mk
+//#define MAX_COUNT   15       //mk
 
 #define HAL_GPIO_SW1 GPIO_Number_9 // Used for gEnginestartSW (SW1 in board)
 #define HAL_GPIO_SW2 GPIO_Number_7 // For future use (SW2 in board)
@@ -317,8 +317,8 @@ uint16_t gHallCount = 0;
 uint16_t gstallCount = 0;
 uint16_t gReadyCount = 0;
 //uint16_t gCount = 0;      // mk
-uint16_t giq_ramp_cnt = 0;  //mk
-uint16_t gtest = 0;         //mk
+//uint16_t giq_ramp_cnt = 0;  //mk
+//uint16_t gtest = 0;         //mk
 
 _iq gTps           = _IQ(0.0);
 _iq togglingPt     = _IQ(0.0);
@@ -919,23 +919,13 @@ interrupt void mainISR(void)
     {
         HAL_toggleLed(halHandle,(GPIO_Number_e)HAL_Gpio_LED2);
 
-        if(gHall_Flag_EnableBldc == true && ENGINE_isTpsON(&gAdcData) == true)     //{ mk
+       /* if(gHall_Flag_EnableBldc == true && ENGINE_isTpsON(&gAdcData) == true)     //{ mk
          {
             if(giq_ramp_cnt < MAX_COUNT)
             {
                 giq_ramp_cnt++;
             }
-         }                                        //}  mk
-
-        /*  if(tpsOnOff == true && giq_ramp_cnt < MAX_COUNT)   //{ //current ramp in sensor(bldc) mode //mk
-           {
-               giq_ramp_cnt++;
-           }
-           else
-           {
-               giq_ramp_cnt = 0;
-           }       */                                    //} mk
-
+         }          */                              //}  mk
 
         gLEDcnt = 0;      // default LED blink code
 
@@ -1950,7 +1940,7 @@ bool ENGINE_isTpsON(HAL_AdcData_t *pAdcData)
     if(pAdcData->potentiometer > START_BAND)
     {
         tpsOnOff = true;                //tpsOn
-        gtest = gAdcData.potentiometer;         //mk
+      //  gtest = gAdcData.potentiometer;         //mk
 
         //if (gTimerCnt<= MAX_TIMER_CNT_SEC)HAL_acqTimer0Int(halHandle);
     }
@@ -2073,17 +2063,17 @@ _iq computeTps(HAL_AdcData_t *pAdcData)
             }
             else
             {
-                if(gHall_Flag_EnableBldc == true)   // { mk
+              /*  if(gHall_Flag_EnableBldc == true)   // { mk
                 {
                     gTps = giq_ramp_cnt;
                 }
                 else
-                {                                   // } mk
+                {                           */        // } mk
                     //get the Tps value
                     gTps = ((throttleValue - startValue)/(WIDTH_PER_DIVISION));
                     gTps = (gTps * (MOTOR_MAX_CURRENT/NO_OF_DIVISION))+(BASE_CURRENT_A);
 
-                }                                  // mk
+            //    }                                  // mk
 
 
                 //limit the tps value under the motor max current
