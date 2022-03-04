@@ -66,7 +66,7 @@
 // **************************************************************************
 // the defines
 
-#define LED_BLINK_FREQ_Hz   5       //5
+#define LED_BLINK_FREQ_Hz   5
 //#define DELAY_COUNT 3      // mk
 //#define MAX_COUNT   15       //mk
 
@@ -316,9 +316,9 @@ uint16_t gLEDcnt   =  0;
 uint16_t gHallCount = 0;
 uint16_t gstallCount = 0;
 uint16_t gReadyCount = 0;
-//uint16_t gCount = 0;      // mk
+//uint16_t gCount = 0;        // mk
 //uint16_t giq_ramp_cnt = 0;  //mk
-//uint16_t gtest = 0;         //mk
+//uint16_t gtest = 0;         //mk      // to display the throttle value
 
 _iq gTps           = _IQ(0.0);
 _iq togglingPt     = _IQ(0.0);
@@ -925,7 +925,7 @@ interrupt void mainISR(void)
             {
                 giq_ramp_cnt++;
             }
-         }          */                              //}  mk
+         }          */                                                                //}  mk
 
         gLEDcnt = 0;      // default LED blink code
 
@@ -2073,7 +2073,7 @@ _iq computeTps(HAL_AdcData_t *pAdcData)
                     gTps = ((throttleValue - startValue)/(WIDTH_PER_DIVISION));
                     gTps = (gTps * (MOTOR_MAX_CURRENT/NO_OF_DIVISION))+(BASE_CURRENT_A);
 
-            //    }                                  // mk
+            //  }                                  // mk
 
 
                 //limit the tps value under the motor max current
@@ -2090,7 +2090,7 @@ _iq computeTps(HAL_AdcData_t *pAdcData)
                  else
                  {
                     gTps=gTps;
-                 }   */                     //mk
+                 }   */                                 //mk
              }
 
             //set current throttle value for processing toggling
@@ -2212,7 +2212,6 @@ void new_startup(void)
         {
             gMotorVars.IqRef_A = _IQ(USER_MOTOR_MAX_CURRENT); //set motor max current
         }
-
         else if ((_IQabs(gHall_krpm) <= gHall_speed_FastToBldc_low_pu) && (gflag == true))  //enter FAST to BLDC condition
         {
             gMotorVars.IqRef_A = _IQ(MOTOR_LOWSPEED_CURRENT); //set constant current
